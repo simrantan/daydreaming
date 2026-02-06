@@ -81,14 +81,19 @@ const LOCAL_TRACKS: SongTrack[] = [
 ];
 
 function buildMockDaydreamList(): DaydreamItem[] {
-  return LOCAL_VIDEOS.flatMap((videoSource, vi) =>
-    LOCAL_TRACKS.map((song, si) => ({
-      videoId: `v${vi + 1}`,
+  const count = Math.max(LOCAL_VIDEOS.length * 3, 9);
+  return Array.from({ length: count }, (_, i) => {
+    const videoIndex = i % LOCAL_VIDEOS.length;
+    const trackIndex = i % LOCAL_TRACKS.length;
+    const videoSource = LOCAL_VIDEOS[videoIndex];
+    const song = LOCAL_TRACKS[trackIndex];
+    return {
+      videoId: `v${videoIndex + 1}`,
       audioId: song.audioId,
       videoSource,
       song,
-    }))
-  ).slice(0, 9); // 9 cards: each of 3 videos paired with 3 different tracks
+    };
+  });
 }
 
 const MOCK_DAYDREAMS = buildMockDaydreamList();

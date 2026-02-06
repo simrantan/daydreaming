@@ -18,23 +18,24 @@ export default function TabLayout() {
 
   return (
     <Tabs
+      initialRouteName="index"
       screenOptions={{
         tabBarActiveTintColor: tint,
         headerShown: useClientOnlyValue(false, true),
       }}>
-      <Tabs.Screen
-        name="add"
-        options={{
-          title: 'Add',
-          tabBarIcon: ({ color }) => <TabBarIcon name="add" color={color} />,
-        }}
-      />
       <Tabs.Screen
         name="index"
         options={{
           title: 'Explore',
           headerShown: false,
           tabBarIcon: ({ color }) => <TabBarIcon name="shuffle" color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="add"
+        options={{
+          title: 'Add',
+          tabBarIcon: ({ color }) => <TabBarIcon name="add" color={color} />,
         }}
       />
       <Tabs.Screen

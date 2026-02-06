@@ -19,6 +19,8 @@ type VideoCardProps = {
   isSaved: boolean;
   onToggleSave: () => void;
   isActive?: boolean;
+  contentHeight: number;
+  contentWidth: number;
 };
 
 export function VideoCard({
@@ -29,6 +31,8 @@ export function VideoCard({
   isSaved,
   onToggleSave,
   isActive = true,
+  contentHeight,
+  contentWidth,
 }: VideoCardProps) {
   const source = videoSourceToExpoSource(item.videoSource);
   const player = useVideoPlayer(source, (p) => {
@@ -40,8 +44,10 @@ export function VideoCard({
     else player.pause();
   }, [isActive, player]);
 
+  const containerStyle = { width: contentWidth, height: contentHeight };
+
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, containerStyle]}>
       <VideoView
         style={StyleSheet.absoluteFill}
         player={player}
@@ -51,7 +57,7 @@ export function VideoCard({
       <Pressable style={styles.heartButton} onPress={onToggleSave} hitSlop={12}>
         <Ionicons
           name={isSaved ? 'heart' : 'heart-outline'}
-          size={32}
+          size={28}
           color={isSaved ? '#e74c3c' : '#fff'}
         />
       </Pressable>
@@ -61,6 +67,7 @@ export function VideoCard({
         album={currentSong.album}
         onPress={onTapSongBar}
         onShuffle={onShuffleNextSong}
+        contentWidth={contentWidth}
       />
     </View>
   );
@@ -68,13 +75,12 @@ export function VideoCard({
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
-    width: '100%',
+    overflow: 'hidden',
   },
   heartButton: {
     position: 'absolute',
-    top: 60,
-    right: 20,
+    top: 12,
+    right: 12,
     zIndex: 10,
   },
 });

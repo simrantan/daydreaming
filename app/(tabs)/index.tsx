@@ -3,24 +3,37 @@ import {
   StyleSheet,
   View,
   FlatList,
-  Dimensions,
   Pressable,
   Text,
   Modal,
   Share,
   Alert,
+  useWindowDimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useAudioPlayer, setAudioModeAsync } from 'expo-audio';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { getFeatured, getNextSong, getQueue, type DaydreamItem, type SongTrack } from '@/api/daydream';
+import { getFeatured, getNextSong, getQueue, type DaydreamItem, type SongTrack, type VideoAudioSource } from '@/api/daydream';
 import { VideoCard } from '@/components/explore/VideoCard';
 import { QueueSheet } from '@/components/explore/QueueSheet';
 
+function toAudioSource(source: VideoAudioSource): string | number {
+  if (typeof source === 'number') return source;
+  return source.uri;
+}
+
 const SAVED_DAYDREAMS_KEY = '@daydreaming/saved';
+
+const HEADER_BAR_HEIGHT = 56;
+const TAB_BAR_HEIGHT = 49;
 
 export default function ExploreScreen() {
   const insets = useSafeAreaInsets();
+  const { width, height } = useWindowDimensions();
+  const headerHeight = insets.top + HEADER_BAR_HEIGHT;
+  const tabBarHeight = TAB_BAR_HEIGHT + insets.bottom;
+  const contentHeight = height - headerHeight - tabBarHeight;
   const [list, setList] = useState<DaydreamItem[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [currentSongByIndex, setCurrentSongByIndex] = useState<Record<number, SongTrack>>({});
@@ -29,6 +42,23 @@ export default function ExploreScreen() {
   const [menuVisible, setMenuVisible] = useState(false);
   const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
+
+  const audioPlayer = useAudioPlayer(null);
+
+  useEffect(() => {
+    setAudioModeAsync({
+      playsInSilentMode: true,
+      interruptionMode: 'duckOthers',
+    }).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    if (!currentSong) return;
+    const source = toAudioSource(currentSong.audioSource);
+    audioPlayer.replace(source);
+    audioPlayer.loop = true;
+    audioPlayer.play();
+  }, [currentSong?.audioId, currentIndex, audioPlayer]);
 
   const loadSaved = useCallback(async () => {
     try {
@@ -125,11 +155,9 @@ export default function ExploreScreen() {
     );
   }
 
-  const { height } = Dimensions.get('window');
-
   return (
     <View style={styles.container}>
-      <View style={[styles.header, { paddingTop: insets.top }]}>
+      <View style={[styles.header, { paddingTop: insets.top, height: headerHeight }]}>
         <Text style={styles.headerTitle}>DayDreaming</Text>
         <Pressable
           style={styles.menuButton}
@@ -142,16 +170,19 @@ export default function ExploreScreen() {
 
       <FlatList
         data={list}
-        keyExtractor={(item) => `${item.videoId}-${item.audioId}`}
+        keyExtractor={(item, index) => `daydream-${index}-${item.videoId}-${item.audioId}`}
         pagingEnabled
         showsVerticalScrollIndicator={false}
+        style={{ marginTop: headerHeight, height: contentHeight }}
         onMomentumScrollEnd={(e) => {
-          const i = Math.round(e.nativeEvent.contentOffset.y / height);
+          const i = Math.round(e.nativeEvent.contentOffset.y / contentHeight);
           setCurrentIndex(i);
         }}
         renderItem={({ item, index }) => (
-          <View style={{ height }}>
+          <View style={{ width, height: contentHeight }}>
             <VideoCard
+              contentHeight={contentHeight}
+              contentWidth={width}
               item={item}
               currentSong={
                 currentSongByIndex[index] ?? item.song
