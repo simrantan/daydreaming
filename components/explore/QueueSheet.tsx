@@ -7,16 +7,18 @@ import {
   Pressable,
   ScrollView,
 } from 'react-native';
-import type { SongTrack } from '@/api/daydream';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import type { SongTrack } from '@/api/daydream';
 
 type QueueSheetProps = {
   visible: boolean;
   tracks: SongTrack[];
+  currentAudioId?: string;
   onClose: () => void;
+  onSelectTrack: (track: SongTrack) => void;
 };
 
-export function QueueSheet({ visible, tracks, onClose }: QueueSheetProps) {
+export function QueueSheet({ visible, tracks, currentAudioId, onClose, onSelectTrack }: QueueSheetProps) {
   return (
     <Modal
       visible={visible}
@@ -31,13 +33,36 @@ export function QueueSheet({ visible, tracks, onClose }: QueueSheetProps) {
           </Pressable>
           <Text style={styles.title}>Up next</Text>
           <ScrollView style={styles.list} keyboardShouldPersistTaps="handled">
-            {tracks.map((t, i) => (
-              <View key={t.audioId + i} style={styles.row}>
-                <Text style={styles.trackText} numberOfLines={1}>
-                  {t.songTitle} – {t.artist} – {t.album}
-                </Text>
-              </View>
-            ))}
+            {tracks.map((t, i) => {
+              const isPlaying = t.audioId === currentAudioId;
+              return (
+                <Pressable
+                  key={t.audioId + i}
+                  style={({ pressed }) => [
+                    styles.row,
+                    isPlaying && styles.rowActive,
+                    pressed && styles.rowPressed,
+                  ]}
+                  onPress={() => onSelectTrack(t)}
+                >
+                  <Ionicons
+                    name={isPlaying ? 'musical-notes' : 'musical-note-outline'}
+                    size={18}
+                    color={isPlaying ? '#fff' : 'rgba(255,255,255,0.5)'}
+                    style={styles.rowIcon}
+                  />
+                  <Text
+                    style={[styles.trackText, isPlaying && styles.trackTextActive]}
+                    numberOfLines={1}
+                  >
+                    {t.songTitle} – {t.artist}
+                  </Text>
+                  {isPlaying && (
+                    <Ionicons name="volume-medium" size={16} color="#fff" style={styles.playingIcon} />
+                  )}
+                </Pressable>
+              );
+            })}
           </ScrollView>
         </View>
       </Pressable>
@@ -78,12 +103,34 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   row: {
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingVertical: 12,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: 'rgba(255,255,255,0.1)',
+    borderRadius: 8,
+    paddingHorizontal: 4,
+  },
+  rowActive: {
+    backgroundColor: 'rgba(255,255,255,0.08)',
+  },
+  rowPressed: {
+    backgroundColor: 'rgba(255,255,255,0.12)',
+  },
+  rowIcon: {
+    marginRight: 10,
+    width: 20,
+  },
+  playingIcon: {
+    marginLeft: 8,
   },
   trackText: {
-    color: '#fff',
+    color: 'rgba(255,255,255,0.7)',
     fontSize: 15,
+    flex: 1,
+  },
+  trackTextActive: {
+    color: '#fff',
+    fontWeight: '600',
   },
 });

@@ -20,6 +20,12 @@ todos:
 isProject: false
 ---
 
+## MVP Features
+- Scroll videos
+- Choose music moods and video themes
+- Swap music
+- Save DDs and/or individual video/music to favorites
+
 ## Goal
 Make the app feel "music-first" with a persistent calm <-> upbeat control, then evolve from saving IDs to saving full daydream objects (video + track combo) locally.
 

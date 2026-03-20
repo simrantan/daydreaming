@@ -14,16 +14,17 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAudioPlayer, setAudioModeAsync } from 'expo-audio';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { getFeatured, getNextSong, getQueue, type DaydreamItem, type SongTrack, type VideoAudioSource } from '@/api/daydream';
+import { getFeatured, getNextSong, getQueue, type DaydreamItem, type SongTrack, type VideoAudioSource, type VideoTheme } from '@/api/daydream';
+import { loadSavedItems, persistSavedItems, savedItemId, type SavedItem, type SaveType } from '@/api/saved';
 import { VideoCard } from '@/components/explore/VideoCard';
 import { QueueSheet } from '@/components/explore/QueueSheet';
+import { MoodThemePicker } from '@/components/explore/MoodThemePicker';
+import { SaveOptionsSheet } from '@/components/explore/SaveOptionsSheet';
 
 function toAudioSource(source: VideoAudioSource): string | number {
   if (typeof source === 'number') return source;
   return source.uri;
 }
-
-const SAVED_DAYDREAMS_KEY = '@daydreaming/saved';
 
 const HEADER_BAR_HEIGHT = 56;
 const TAB_BAR_HEIGHT = 49;
@@ -34,14 +35,20 @@ export default function ExploreScreen() {
   const headerHeight = insets.top + HEADER_BAR_HEIGHT;
   const tabBarHeight = TAB_BAR_HEIGHT + insets.bottom;
   const contentHeight = height - headerHeight - tabBarHeight;
+
   const [list, setList] = useState<DaydreamItem[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [currentSongByIndex, setCurrentSongByIndex] = useState<Record<number, SongTrack>>({});
   const [queue, setQueue] = useState<SongTrack[]>([]);
   const [queueVisible, setQueueVisible] = useState(false);
   const [menuVisible, setMenuVisible] = useState(false);
-  const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
+  const [savedItems, setSavedItems] = useState<SavedItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [moodValue, setMoodValue] = useState(0.5);
+  const [videoTheme, setVideoTheme] = useState<VideoTheme | null>(null);
+  const [moodPickerVisible, setMoodPickerVisible] = useState(false);
+  const [saveSheetVisible, setSaveSheetVisible] = useState(false);
+  const [saveSheetItem, setSaveSheetItem] = useState<{ item: DaydreamItem; song: SongTrack } | null>(null);
 
   const audioPlayer = useAudioPlayer(null);
 
@@ -61,34 +68,44 @@ export default function ExploreScreen() {
   }, [currentSong?.audioId, currentIndex, audioPlayer]);
 
   const loadSaved = useCallback(async () => {
-    try {
-      const raw = await AsyncStorage.getItem(SAVED_DAYDREAMS_KEY);
-      if (raw) {
-        const arr = JSON.parse(raw) as string[];
-        setSavedIds(new Set(arr));
+    const items = await loadSavedItems();
+    setSavedItems(items);
+  }, []);
+
+  // Load persisted preferences; auto-open picker if first launch
+  useEffect(() => {
+    async function loadPrefs() {
+      try {
+        const storedMood = await AsyncStorage.getItem('@daydreaming/moodValue');
+        const storedTheme = await AsyncStorage.getItem('@daydreaming/videoTheme');
+        if (storedMood !== null) setMoodValue(parseFloat(storedMood));
+        if (storedTheme !== null) setVideoTheme(storedTheme === '' ? null : storedTheme as VideoTheme);
+
+        // Always show the picker on launch so user can set mood/theme
+        setMoodPickerVisible(true);
+      } catch {
+        // ignore
       }
-    } catch {
-      // ignore
     }
+    loadPrefs();
   }, []);
 
   useEffect(() => {
     let cancelled = false;
-    getFeatured().then((data) => {
+    setLoading(true);
+    getFeatured(moodValue, videoTheme).then((data) => {
       if (!cancelled) {
         setList(data);
-        data.forEach((item, i) => {
-          setCurrentSongByIndex((prev) => ({
-            ...prev,
-            [i]: item.song,
-          }));
-        });
+        setCurrentIndex(0);
+        const initial: Record<number, SongTrack> = {};
+        data.forEach((item, i) => { initial[i] = item.song; });
+        setCurrentSongByIndex(initial);
         setLoading(false);
       }
     });
     loadSaved();
     return () => { cancelled = true; };
-  }, [loadSaved]);
+  }, [loadSaved, moodValue, videoTheme]);
 
   const currentItem = list[currentIndex] ?? null;
   const currentSong = currentItem
@@ -97,8 +114,16 @@ export default function ExploreScreen() {
 
   const handleShuffleForCard = useCallback(
     async (videoId: string) => {
-      const next = await getNextSong(videoId);
+      const next = await getNextSong(videoId, moodValue);
       setCurrentSongByIndex((prev) => ({ ...prev, [currentIndex]: next }));
+    },
+    [currentIndex, moodValue]
+  );
+
+  const handleSelectTrack = useCallback(
+    (track: SongTrack) => {
+      setCurrentSongByIndex((prev) => ({ ...prev, [currentIndex]: track }));
+      setQueueVisible(false);
     },
     [currentIndex]
   );
@@ -110,16 +135,73 @@ export default function ExploreScreen() {
     setQueueVisible(true);
   }, [currentItem]);
 
-  const toggleSave = useCallback(
-    async (item: DaydreamItem) => {
-      const id = `${item.videoId}-${item.audioId}`;
-      setSavedIds((prev) => {
-        const next = new Set(prev);
-        if (next.has(id)) next.delete(id);
-        else next.add(id);
-        AsyncStorage.setItem(SAVED_DAYDREAMS_KEY, JSON.stringify([...next]));
-        return next;
+  const setSaveForType = useCallback(
+    (item: DaydreamItem, type: SaveType, song: SongTrack, shouldSave: boolean) => {
+      setSavedItems((prev) => {
+        const candidate: SavedItem = {
+          type,
+          videoId: type !== 'music' ? item.videoId : undefined,
+          audioId: type !== 'video' ? song.audioId : undefined,
+          videoTheme: type !== 'music' ? item.videoTheme : undefined,
+          songTitle: type !== 'video' ? song.songTitle : undefined,
+          artist: type !== 'video' ? song.artist : undefined,
+          savedAt: Date.now(),
+        };
+        const id = savedItemId(candidate);
+        const exists = prev.some((s) => savedItemId(s) === id);
+        if (shouldSave && !exists) {
+          const next = [candidate, ...prev];
+          persistSavedItems(next);
+          return next;
+        }
+        if (!shouldSave && exists) {
+          const next = prev.filter((s) => savedItemId(s) !== id);
+          persistSavedItems(next);
+          return next;
+        }
+        return prev;
       });
+    },
+    []
+  );
+
+  const handleSaveOptions = useCallback(
+    (saveDaydream: boolean, saveVideo: boolean, saveMusic: boolean) => {
+      if (!saveSheetItem) return;
+      const { item, song } = saveSheetItem;
+      setSaveForType(item, 'daydream', song, saveDaydream);
+      setSaveForType(item, 'video', song, saveVideo);
+      setSaveForType(item, 'music', song, saveMusic);
+    },
+    [saveSheetItem, setSaveForType]
+  );
+
+  const isSaved = useCallback(
+    (item: DaydreamItem, type: SaveType, song: SongTrack): boolean => {
+      const candidate: SavedItem = {
+        type,
+        videoId: type !== 'music' ? item.videoId : undefined,
+        audioId: type !== 'video' ? song.audioId : undefined,
+        savedAt: 0,
+      };
+      const id = savedItemId(candidate);
+      return savedItems.some((s) => savedItemId(s) === id);
+    },
+    [savedItems]
+  );
+
+  const isAnySaved = useCallback(
+    (item: DaydreamItem, song: SongTrack): boolean =>
+      isSaved(item, 'daydream', song) ||
+      isSaved(item, 'video', song) ||
+      isSaved(item, 'music', song),
+    [isSaved]
+  );
+
+  const openSaveSheet = useCallback(
+    (item: DaydreamItem, song: SongTrack) => {
+      setSaveSheetItem({ item, song });
+      setSaveSheetVisible(true);
     },
     []
   );
@@ -147,6 +229,8 @@ export default function ExploreScreen() {
     Alert.alert('Other Actions', 'Other actions placeholder.');
   }, []);
 
+  const isFilterActive = moodValue !== 0.5 || videoTheme !== null;
+
   if (loading || list.length === 0) {
     return (
       <View style={[styles.centered, { paddingTop: insets.top }]}>
@@ -164,7 +248,7 @@ export default function ExploreScreen() {
           onPress={() => setMenuVisible(true)}
           hitSlop={12}
         >
-          <Ionicons name="ellipsis-horizontal" size={24} color="#000" />
+          <Ionicons name="ellipsis-horizontal" size={24} color="#fff" />
         </Pressable>
       </View>
 
@@ -178,36 +262,59 @@ export default function ExploreScreen() {
           const i = Math.round(e.nativeEvent.contentOffset.y / contentHeight);
           setCurrentIndex(i);
         }}
-        renderItem={({ item, index }) => (
-          <View style={{ width, height: contentHeight }}>
-            <VideoCard
-              contentHeight={contentHeight}
-              contentWidth={width}
-              item={item}
-              currentSong={
-                currentSongByIndex[index] ?? item.song
-                  ? {
-                      songTitle: (currentSongByIndex[index] ?? item.song).songTitle,
-                      artist: (currentSongByIndex[index] ?? item.song).artist,
-                      album: (currentSongByIndex[index] ?? item.song).album,
-                    }
-                  : { songTitle: '', artist: '', album: '' }
-              }
-              onTapSongBar={openQueue}
-              onShuffleNextSong={() => handleShuffleForCard(item.videoId)}
-              isSaved={savedIds.has(`${item.videoId}-${item.audioId}`)}
-              onToggleSave={() => toggleSave(item)}
-              isActive={index === currentIndex}
-            />
-          </View>
-        )}
+        renderItem={({ item, index }) => {
+          const song = currentSongByIndex[index] ?? item.song;
+          return (
+            <View style={{ width, height: contentHeight }}>
+              <VideoCard
+                contentHeight={contentHeight}
+                contentWidth={width}
+                item={item}
+                currentSong={song}
+                onTapSongBar={openQueue}
+                onShuffleNextSong={() => handleShuffleForCard(item.videoId)}
+                isAnySaved={isAnySaved(item, song)}
+                onOpenSaveSheet={() => openSaveSheet(item, song)}
+                onOpenFilter={() => setMoodPickerVisible(true)}
+                isFilterActive={isFilterActive}
+                isActive={index === currentIndex}
+              />
+            </View>
+          );
+        }}
       />
 
       <QueueSheet
         visible={queueVisible}
         tracks={queue}
+        currentAudioId={currentSong?.audioId}
         onClose={() => setQueueVisible(false)}
+        onSelectTrack={handleSelectTrack}
       />
+
+      <MoodThemePicker
+        visible={moodPickerVisible}
+        moodValue={moodValue}
+        videoTheme={videoTheme}
+        onApply={(mood, theme) => {
+          setMoodValue(mood);
+          setVideoTheme(theme);
+          AsyncStorage.setItem('@daydreaming/moodValue', String(mood)).catch(() => {});
+          AsyncStorage.setItem('@daydreaming/videoTheme', theme ?? '').catch(() => {});
+        }}
+        onClose={() => setMoodPickerVisible(false)}
+      />
+
+      {saveSheetItem && (
+        <SaveOptionsSheet
+          visible={saveSheetVisible}
+          initialDaydreamSaved={isSaved(saveSheetItem.item, 'daydream', saveSheetItem.song)}
+          initialVideoSaved={isSaved(saveSheetItem.item, 'video', saveSheetItem.song)}
+          initialMusicSaved={isSaved(saveSheetItem.item, 'music', saveSheetItem.song)}
+          onSave={handleSaveOptions}
+          onClose={() => setSaveSheetVisible(false)}
+        />
+      )}
 
       <Modal visible={menuVisible} transparent animationType="fade">
         <Pressable style={styles.menuBackdrop} onPress={() => setMenuVisible(false)}>
@@ -253,13 +360,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingBottom: 12,
     paddingHorizontal: 16,
-    backgroundColor: '#fff',
+    backgroundColor: '#000',
     zIndex: 20,
   },
   headerTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#000',
+    color: '#fff',
   },
   menuButton: {
     position: 'absolute',
@@ -275,12 +382,12 @@ const styles = StyleSheet.create({
     paddingRight: 24,
   },
   menuPopover: {
-    backgroundColor: '#fff',
+    backgroundColor: '#1a1a1a',
     borderRadius: 12,
     minWidth: 160,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
+    shadowOpacity: 0.4,
     shadowRadius: 8,
     elevation: 4,
   },
@@ -290,6 +397,6 @@ const styles = StyleSheet.create({
   },
   menuItemText: {
     fontSize: 16,
-    color: '#1a1a1a',
+    color: '#fff',
   },
 });

@@ -22,6 +22,7 @@ export default function TabLayout() {
       screenOptions={{
         tabBarActiveTintColor: tint,
         headerShown: useClientOnlyValue(false, true),
+        tabBarStyle: { backgroundColor: '#000', borderTopColor: 'rgba(255,255,255,0.1)' },
       }}>
       <Tabs.Screen
         name="index"
@@ -34,15 +35,14 @@ export default function TabLayout() {
       <Tabs.Screen
         name="add"
         options={{
-          title: 'Add',
-          tabBarIcon: ({ color }) => <TabBarIcon name="add" color={color} />,
+          href: null,
         }}
       />
       <Tabs.Screen
         name="saved"
         options={{
           title: 'Saved',
-          tabBarIcon: ({ color }) => <TabBarIcon name="bookmark" color={color} />,
+          tabBarIcon: ({ color, focused }) => <TabBarIcon name={focused ? 'heart' : 'heart-outline'} color={color} />,
         }}
       />
       <Tabs.Screen

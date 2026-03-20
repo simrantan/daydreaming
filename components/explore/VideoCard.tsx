@@ -1,10 +1,9 @@
 import React, { useEffect } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, View, Pressable } from 'react-native';
 import { useVideoPlayer, VideoView } from 'expo-video';
-import type { DaydreamItem, VideoAudioSource } from '@/api/daydream';
-import { SongBar } from './SongBar';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { Pressable } from 'react-native';
+import type { DaydreamItem, SongTrack, VideoAudioSource } from '@/api/daydream';
+import { SongBar } from './SongBar';
 
 function videoSourceToExpoSource(source: VideoAudioSource): string | number {
   if (typeof source === 'number') return source;
@@ -13,11 +12,13 @@ function videoSourceToExpoSource(source: VideoAudioSource): string | number {
 
 type VideoCardProps = {
   item: DaydreamItem;
-  currentSong: { songTitle: string; artist: string; album: string };
+  currentSong: SongTrack;
   onTapSongBar: () => void;
   onShuffleNextSong: () => void;
-  isSaved: boolean;
-  onToggleSave: () => void;
+  isAnySaved: boolean;
+  onOpenSaveSheet: () => void;
+  onOpenFilter: () => void;
+  isFilterActive: boolean;
   isActive?: boolean;
   contentHeight: number;
   contentWidth: number;
@@ -28,8 +29,10 @@ export function VideoCard({
   currentSong,
   onTapSongBar,
   onShuffleNextSong,
-  isSaved,
-  onToggleSave,
+  isAnySaved,
+  onOpenSaveSheet,
+  onOpenFilter,
+  isFilterActive,
   isActive = true,
   contentHeight,
   contentWidth,
@@ -39,6 +42,7 @@ export function VideoCard({
     p.loop = true;
     p.muted = true;
   });
+
   useEffect(() => {
     if (isActive) player.play();
     else player.pause();
@@ -54,13 +58,21 @@ export function VideoCard({
         contentFit="cover"
         nativeControls={false}
       />
-      <Pressable style={styles.heartButton} onPress={onToggleSave} hitSlop={12}>
+
+      {/* Top-left: filter icon */}
+      <Pressable style={styles.filterIconButton} onPress={onOpenFilter} hitSlop={12}>
+        <Ionicons name="options" size={32} color="#fff" />
+      </Pressable>
+
+      {/* Top-right: heart */}
+      <Pressable style={styles.heartButton} onPress={onOpenSaveSheet} hitSlop={12}>
         <Ionicons
-          name={isSaved ? 'heart' : 'heart-outline'}
-          size={28}
-          color={isSaved ? '#e74c3c' : '#fff'}
+          name={isAnySaved ? 'heart' : 'heart-outline'}
+          size={32}
+          color={isAnySaved ? '#e74c3c' : '#fff'}
         />
       </Pressable>
+
       <SongBar
         songTitle={currentSong.songTitle}
         artist={currentSong.artist}
@@ -77,10 +89,21 @@ const styles = StyleSheet.create({
   container: {
     overflow: 'hidden',
   },
+  filterIconButton: {
+    position: 'absolute',
+    top: 12,
+    left: 12,
+    padding: 4,
+    zIndex: 10,
+  },
   heartButton: {
     position: 'absolute',
     top: 12,
     right: 12,
+    padding: 4,
     zIndex: 10,
+  },
+  iconButton: {
+    padding: 4,
   },
 });

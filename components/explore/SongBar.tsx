@@ -1,9 +1,12 @@
-import React from 'react';
-import { StyleSheet, View, Pressable, Text } from 'react-native';
+import React, { useRef, useEffect, useState } from 'react';
+import { StyleSheet, View, Pressable, Animated } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
-const MIN_SONG_BAR_HEIGHT = 40;
-const MAX_SONG_BAR_HEIGHT = 52;
+const BAR_HEIGHT = 68;
+const FONT_SIZE = 17;
+const MARQUEE_SPEED = 40; // pts per second
+const MARQUEE_PAUSE_MS = 1200;
+const MARQUEE_GAP = 60; // gap between repetitions
 
 type SongBarProps = {
   songTitle: string;
@@ -14,22 +17,90 @@ type SongBarProps = {
   contentWidth: number;
 };
 
-export function SongBar({ songTitle, artist, album, onPress, onShuffle, contentWidth }: SongBarProps) {
-  const barHeight = Math.min(MAX_SONG_BAR_HEIGHT, Math.max(MIN_SONG_BAR_HEIGHT, contentWidth * 0.12));
-  const paddingH = Math.max(10, contentWidth * 0.04);
-  const thumbSize = Math.round(barHeight * 0.7);
-  const fontSize = Math.max(11, Math.min(14, contentWidth * 0.035));
-  const iconSize = Math.round(barHeight * 0.55);
+function MarqueeText({ text, containerWidth }: { text: string; containerWidth: number }) {
+  const translateX = useRef(new Animated.Value(0)).current;
+  const [textWidth, setTextWidth] = useState(0);
+  const animRef = useRef<Animated.CompositeAnimation | null>(null);
+
+  useEffect(() => {
+    if (animRef.current) {
+      animRef.current.stop();
+      animRef.current = null;
+    }
+    translateX.setValue(0);
+
+    if (textWidth <= containerWidth || textWidth === 0 || containerWidth === 0) return;
+
+    const scrollDistance = textWidth + MARQUEE_GAP;
+    const duration = (scrollDistance / MARQUEE_SPEED) * 1000;
+
+    const anim = Animated.loop(
+      Animated.sequence([
+        Animated.delay(MARQUEE_PAUSE_MS),
+        Animated.timing(translateX, {
+          toValue: -scrollDistance,
+          duration,
+          useNativeDriver: true,
+        }),
+        Animated.delay(MARQUEE_PAUSE_MS),
+        Animated.timing(translateX, {
+          toValue: 0,
+          duration: 0,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+
+    animRef.current = anim;
+    anim.start();
+
+    return () => {
+      anim.stop();
+    };
+  }, [textWidth, containerWidth, text, translateX]);
+
+  const shouldScroll = textWidth > containerWidth && containerWidth > 0;
 
   return (
-    <View style={[styles.container, { height: barHeight, paddingHorizontal: paddingH }]}>
+    <View style={styles.marqueeContainer}>
+      <Animated.Text
+        style={[
+          styles.marqueeText,
+          shouldScroll && { transform: [{ translateX }] },
+        ]}
+        numberOfLines={1}
+        onLayout={(e) => setTextWidth(e.nativeEvent.layout.width)}
+      >
+        {text}
+        {shouldScroll ? `${'  '.repeat(8)}${text}` : ''}
+      </Animated.Text>
+    </View>
+  );
+}
+
+export function SongBar({ songTitle, artist, album, onPress, onShuffle, contentWidth }: SongBarProps) {
+  const paddingH = Math.max(12, contentWidth * 0.04);
+  const thumbSize = Math.round(BAR_HEIGHT * 0.52);
+  const iconSize = 24;
+  // Reserve space: thumb + gap + two icon buttons
+  const textContainerWidth = contentWidth - paddingH * 2 - thumbSize - paddingH - iconSize * 2 - 24;
+
+  const displayText = album ? `${songTitle} – ${artist} – ${album}` : `${songTitle} – ${artist}`;
+
+  return (
+    <View style={[styles.container, { height: BAR_HEIGHT, paddingHorizontal: paddingH }]}>
       <Pressable style={styles.content} onPress={onPress}>
-        <View style={[styles.thumb, { width: thumbSize, height: thumbSize, borderRadius: thumbSize / 2, marginRight: paddingH }]} />
-        <Text style={[styles.text, { fontSize }]} numberOfLines={1}>
-          {songTitle} – {artist} – {album}
-        </Text>
+        <View
+          style={[
+            styles.thumb,
+            { width: thumbSize, height: thumbSize, borderRadius: thumbSize / 2, marginRight: paddingH * 0.6 },
+          ]}
+        />
+        <View style={[styles.textWrap, { width: textContainerWidth }]}>
+          <MarqueeText text={displayText} containerWidth={textContainerWidth} />
+        </View>
       </Pressable>
-      <Pressable style={styles.shuffleButton} onPress={onShuffle} hitSlop={8}>
+      <Pressable style={styles.iconButton} onPress={onShuffle} hitSlop={8}>
         <Ionicons name="shuffle" size={iconSize} color="#fff" />
       </Pressable>
     </View>
@@ -44,23 +115,33 @@ const styles = StyleSheet.create({
     bottom: 0,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.65)',
-    paddingVertical: 6,
+    backgroundColor: 'rgba(0,0,0,0.72)',
+    paddingVertical: 8,
   },
   content: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     minWidth: 0,
+    overflow: 'hidden',
   },
   thumb: {
-    backgroundColor: 'rgba(255,255,255,0.3)',
+    backgroundColor: 'rgba(255,255,255,0.25)',
+    flexShrink: 0,
   },
-  text: {
+  textWrap: {
+    overflow: 'hidden',
+  },
+  marqueeContainer: {
+    overflow: 'hidden',
+  },
+  marqueeText: {
     color: '#fff',
-    flex: 1,
+    fontSize: FONT_SIZE,
+    fontWeight: '500',
   },
-  shuffleButton: {
-    padding: 6,
+  iconButton: {
+    padding: 8,
+    flexShrink: 0,
   },
 });
