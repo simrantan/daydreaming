@@ -13,8 +13,8 @@ import type { VideoTheme } from '@/api/daydream';
 const THEMES: { label: string; value: VideoTheme | null }[] = [
   { label: 'All', value: null },
   { label: 'Nature', value: 'nature' },
-  { label: 'City', value: 'city' },
-  { label: 'Abstract', value: 'abstract' },
+  { label: 'Beach', value: 'beach' },
+  { label: 'Animals', value: 'animals' },
   { label: 'Minimal', value: 'minimal' },
 ];
 

@@ -13,7 +13,7 @@ const USE_MOCK_DATA = true;
 export type VideoAudioSource = { uri: string } | number; // number = require() asset id
 
 export type MoodLabel = 'calm' | 'mellow' | 'upbeat' | 'energetic';
-export type VideoTheme = 'nature' | 'city' | 'abstract' | 'minimal';
+export type VideoTheme = 'nature' | 'beach' | 'animals' | 'minimal';
 
 export type SongTrack = {
   audioId: string;
@@ -43,8 +43,8 @@ export type DaydreamItem = {
 // --- Local assets: videos and audio from assets/ folder
 const LOCAL_VIDEO_META: VideoMeta[] = [
   { videoId: 'v1', source: require('@/assets/videos/185947-876963225_small.mp4'), theme: 'nature' },
-  { videoId: 'v2', source: require('@/assets/videos/244839_small.mp4'),           theme: 'city' },
-  { videoId: 'v3', source: require('@/assets/videos/328167_small.mp4'),           theme: 'abstract' },
+  { videoId: 'v2', source: require('@/assets/videos/244839_small.mp4'),           theme: 'beach' },
+  { videoId: 'v3', source: require('@/assets/videos/328167_small.mp4'),           theme: 'animals' },
 ];
 
 const LOCAL_TRACKS: SongTrack[] = [
@@ -104,23 +104,36 @@ const LOCAL_TRACKS: SongTrack[] = [
   },
 ];
 
-function buildMockDaydreamList(moodValue?: number, theme?: VideoTheme | null): DaydreamItem[] {
+function randomItem<T>(arr: T[]): T {
+  return arr[Math.floor(Math.random() * arr.length)];
+}
+
+// Tracks the global rotation position across all getMoreDaydreams calls.
+let videoRotationIndex = 0;
+
+/** Generate `count` daydream items, rotating videos in order and randomizing songs. */
+export function getMoreDaydreams(
+  count: number,
+  moodValue?: number,
+  theme?: VideoTheme | null
+): DaydreamItem[] {
   let videos = LOCAL_VIDEO_META;
   if (theme) {
-    videos = LOCAL_VIDEO_META.filter((v) => v.theme === theme);
-    if (videos.length === 0) videos = LOCAL_VIDEO_META;
+    const filtered = LOCAL_VIDEO_META.filter((v) => v.theme === theme);
+    if (filtered.length > 0) videos = filtered;
   }
 
   let tracks = [...LOCAL_TRACKS];
   if (moodValue !== undefined) {
     const target = 1 - moodValue;
     tracks.sort((a, b) => Math.abs(a.calmness - target) - Math.abs(b.calmness - target));
+    tracks = tracks.slice(0, Math.max(1, Math.ceil(tracks.length / 2)));
   }
 
-  const count = Math.max(videos.length * 3, 9);
-  return Array.from({ length: count }, (_, i) => {
-    const video = videos[i % videos.length];
-    const song = tracks[i % tracks.length];
+  return Array.from({ length: count }, () => {
+    const video = videos[videoRotationIndex % videos.length];
+    videoRotationIndex++;
+    const song = randomItem(tracks);
     return {
       videoId: video.videoId,
       audioId: song.audioId,
@@ -135,7 +148,8 @@ function buildMockDaydreamList(moodValue?: number, theme?: VideoTheme | null): D
 
 export async function getFeatured(moodValue?: number, theme?: VideoTheme | null): Promise<DaydreamItem[]> {
   if (USE_MOCK_DATA) {
-    return Promise.resolve(buildMockDaydreamList(moodValue, theme));
+    videoRotationIndex = 0;
+    return Promise.resolve(getMoreDaydreams(9, moodValue, theme));
   }
 
   // When API is available, uncomment and adjust:
@@ -145,7 +159,7 @@ export async function getFeatured(moodValue?: number, theme?: VideoTheme | null)
   // const res = await fetch(`${API_BASE}/featured?${params}`);
   // if (!res.ok) throw new Error('Failed to fetch featured');
   // return res.json() as Promise<DaydreamItem[]>;
-  return Promise.resolve(buildMockDaydreamList(moodValue, theme));
+  return Promise.resolve(getMoreDaydreams(9, moodValue, theme));
 }
 
 export async function getRandomDaydream(moodValue?: number): Promise<DaydreamItem> {

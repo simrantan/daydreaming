@@ -14,7 +14,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAudioPlayer, setAudioModeAsync } from 'expo-audio';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { getFeatured, getNextSong, getQueue, type DaydreamItem, type SongTrack, type VideoAudioSource, type VideoTheme } from '@/api/daydream';
+import { getFeatured, getMoreDaydreams, getNextSong, getQueue, type DaydreamItem, type SongTrack, type VideoAudioSource, type VideoTheme } from '@/api/daydream';
 import { loadSavedItems, persistSavedItems, savedItemId, type SavedItem, type SaveType } from '@/api/saved';
 import { VideoCard } from '@/components/explore/VideoCard';
 import { QueueSheet } from '@/components/explore/QueueSheet';
@@ -127,6 +127,19 @@ export default function ExploreScreen() {
     },
     [currentIndex]
   );
+
+  const appendMore = useCallback(() => {
+    const newItems = getMoreDaydreams(6, moodValue, videoTheme);
+    setList((prev) => {
+      const nextList = [...prev, ...newItems];
+      setCurrentSongByIndex((prevSongs) => {
+        const extra: Record<number, SongTrack> = {};
+        newItems.forEach((item, i) => { extra[prev.length + i] = item.song; });
+        return { ...prevSongs, ...extra };
+      });
+      return nextList;
+    });
+  }, [moodValue, videoTheme]);
 
   const openQueue = useCallback(async () => {
     if (!currentItem) return;
@@ -262,6 +275,8 @@ export default function ExploreScreen() {
           const i = Math.round(e.nativeEvent.contentOffset.y / contentHeight);
           setCurrentIndex(i);
         }}
+        onEndReached={appendMore}
+        onEndReachedThreshold={2}
         renderItem={({ item, index }) => {
           const song = currentSongByIndex[index] ?? item.song;
           return (
