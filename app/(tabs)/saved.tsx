@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import {
   StyleSheet,
   View,
@@ -11,6 +11,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useFocusEffect } from 'expo-router';
 import { loadSavedItems, persistSavedItems, savedItemId, type SavedItem, type SaveType } from '@/api/saved';
+import { resolveDaydreamItems } from '@/api/daydream';
+import { SavedPlayer } from '@/components/explore/SavedPlayer';
 
 const TABS: { label: string; type: SaveType }[] = [
   { label: 'Daydreams', type: 'daydream' },
@@ -45,6 +47,7 @@ export default function SavedScreen() {
   const insets = useSafeAreaInsets();
   const [activeTab, setActiveTab] = useState<SaveType>('daydream');
   const [allItems, setAllItems] = useState<SavedItem[]>([]);
+  const [playerVisible, setPlayerVisible] = useState(false);
 
   const reload = useCallback(async () => {
     const items = await loadSavedItems();
@@ -63,6 +66,11 @@ export default function SavedScreen() {
   }, [reload]);
 
   const filtered = allItems.filter((i) => i.type === activeTab);
+
+  const daydreamItems = useMemo(
+    () => resolveDaydreamItems(allItems.filter((i) => i.type === 'daydream')),
+    [allItems]
+  );
 
   const handleDelete = useCallback(
     (item: SavedItem) => {
@@ -87,7 +95,18 @@ export default function SavedScreen() {
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
-      <Text style={styles.screenTitle}>My Daydreams</Text>
+      <View style={styles.titleRow}>
+        <Text style={styles.screenTitle}>My Daydreams</Text>
+        {activeTab === 'daydream' && daydreamItems.length > 0 && (
+          <Pressable
+            style={styles.playButton}
+            onPress={() => setPlayerVisible(true)}
+            hitSlop={12}
+          >
+            <Ionicons name="play-circle" size={36} color="#fff" />
+          </Pressable>
+        )}
+      </View>
 
       {/* Segmented tabs */}
       <View style={styles.tabRow}>
@@ -153,6 +172,12 @@ export default function SavedScreen() {
           ItemSeparatorComponent={() => <View style={styles.separator} />}
         />
       )}
+
+      <SavedPlayer
+        visible={playerVisible}
+        items={daydreamItems}
+        onClose={() => setPlayerVisible(false)}
+      />
     </View>
   );
 }
@@ -162,13 +187,21 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#000',
   },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 16,
+  },
   screenTitle: {
     color: '#fff',
     fontSize: 22,
     fontWeight: '700',
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    paddingBottom: 16,
+  },
+  playButton: {
+    padding: 2,
   },
   tabRow: {
     flexDirection: 'row',

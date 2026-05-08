@@ -144,6 +144,26 @@ export function getMoreDaydreams(
   });
 }
 
+/**
+ * Reconstruct full DaydreamItems from stored { videoId, audioId } pairs.
+ * Falls back to first video/track if an ID is no longer found.
+ */
+export function resolveDaydreamItems(
+  pairs: { videoId?: string; audioId?: string }[]
+): DaydreamItem[] {
+  return pairs.map(({ videoId, audioId }) => {
+    const video = LOCAL_VIDEO_META.find((v) => v.videoId === videoId) ?? LOCAL_VIDEO_META[0];
+    const track = LOCAL_TRACKS.find((t) => t.audioId === audioId) ?? LOCAL_TRACKS[0];
+    return {
+      videoId: video.videoId,
+      audioId: track.audioId,
+      videoSource: video.source,
+      videoTheme: video.theme,
+      song: track,
+    };
+  });
+}
+
 // --- Public API (same shape whether mock or real).
 
 export async function getFeatured(moodValue?: number, theme?: VideoTheme | null): Promise<DaydreamItem[]> {
