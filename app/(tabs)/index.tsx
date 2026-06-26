@@ -14,7 +14,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAudioPlayer, setAudioModeAsync } from 'expo-audio';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { getFeatured, getMoreDaydreams, getNextSong, getQueue, type DaydreamItem, type SongTrack, type VideoAudioSource, type VideoTheme } from '@/api/daydream';
+import { WebView } from 'react-native-webview';
+import { getFeatured, getMoreFromApi, getNextSong, getQueue, type DaydreamItem, type SongTrack, type VideoAudioSource, type VideoTheme } from '@/api/daydream';
 import { loadSavedItems, persistSavedItems, savedItemId, type SavedItem, type SaveType } from '@/api/saved';
 import { VideoCard } from '@/components/explore/VideoCard';
 import { QueueSheet } from '@/components/explore/QueueSheet';
@@ -24,6 +25,14 @@ import { SaveOptionsSheet } from '@/components/explore/SaveOptionsSheet';
 function toAudioSource(source: VideoAudioSource): string | number {
   if (typeof source === 'number') return source;
   return source.uri;
+}
+
+function isSoundCloudSource(source: VideoAudioSource): source is { uri: string } {
+  return typeof source !== 'number' && source.uri.includes('soundcloud.com');
+}
+
+function soundCloudWidgetUrl(trackUrl: string): string {
+  return `https://w.soundcloud.com/player/?url=${encodeURIComponent(trackUrl)}&auto_play=true&hide_related=true&show_comments=false&show_user=false&show_reposts=false&buying=false&liking=false&download=false&sharing=false&visual=false`;
 }
 
 const HEADER_BAR_HEIGHT = 56;
@@ -59,8 +68,10 @@ export default function ExploreScreen() {
     }).catch(() => {});
   }, []);
 
+  // Only use expo-audio for local (bundled) assets; SoundCloud URLs handled by WebView below
   useEffect(() => {
     if (!currentSong) return;
+    if (isSoundCloudSource(currentSong.audioSource)) return;
     const source = toAudioSource(currentSong.audioSource);
     audioPlayer.replace(source);
     audioPlayer.loop = true;
@@ -129,17 +140,17 @@ export default function ExploreScreen() {
   );
 
   const appendMore = useCallback(() => {
-    const newItems = getMoreDaydreams(6, moodValue, videoTheme);
-    setList((prev) => {
-      const nextList = [...prev, ...newItems];
-      setCurrentSongByIndex((prevSongs) => {
-        const extra: Record<number, SongTrack> = {};
-        newItems.forEach((item, i) => { extra[prev.length + i] = item.song; });
-        return { ...prevSongs, ...extra };
+    getMoreFromApi(6, moodValue).then((newItems) => {
+      setList((prev) => {
+        setCurrentSongByIndex((prevSongs) => {
+          const extra: Record<number, SongTrack> = {};
+          newItems.forEach((item, i) => { extra[prev.length + i] = item.song; });
+          return { ...prevSongs, ...extra };
+        });
+        return [...prev, ...newItems];
       });
-      return nextList;
     });
-  }, [moodValue, videoTheme]);
+  }, [moodValue]);
 
   const openQueue = useCallback(async () => {
     if (!currentItem) return;
@@ -277,6 +288,9 @@ export default function ExploreScreen() {
         }}
         onEndReached={appendMore}
         onEndReachedThreshold={2}
+        initialNumToRender={1}
+        maxToRenderPerBatch={2}
+        windowSize={3}
         renderItem={({ item, index }) => {
           const song = currentSongByIndex[index] ?? item.song;
           return (
@@ -328,6 +342,19 @@ export default function ExploreScreen() {
           initialMusicSaved={isSaved(saveSheetItem.item, 'music', saveSheetItem.song)}
           onSave={handleSaveOptions}
           onClose={() => setSaveSheetVisible(false)}
+        />
+      )}
+
+      {/* Hidden SoundCloud WebView — handles audio when source is a SoundCloud URL */}
+      {currentSong && isSoundCloudSource(currentSong.audioSource) && (
+        <WebView
+          key={currentSong.audioSource.uri}
+          style={styles.hiddenWebView}
+          source={{ uri: soundCloudWidgetUrl(currentSong.audioSource.uri) }}
+          allowsInlineMediaPlayback
+          mediaPlaybackRequiresUserAction={false}
+          javaScriptEnabled
+          originWhitelist={['*']}
         />
       )}
 
@@ -413,5 +440,11 @@ const styles = StyleSheet.create({
   menuItemText: {
     fontSize: 16,
     color: '#fff',
+  },
+  hiddenWebView: {
+    position: 'absolute',
+    width: 0,
+    height: 0,
+    opacity: 0,
   },
 });
