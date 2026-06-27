@@ -1,12 +1,12 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { StyleSheet, View, Pressable, Animated } from 'react-native';
-import Ionicons from '@expo/vector-icons/Ionicons';
+import Ionicons from 'react-native-vector-icons/Ionicons';
 
 const BAR_HEIGHT = 68;
 const FONT_SIZE = 17;
-const MARQUEE_SPEED = 40; // pts per second
+const MARQUEE_SPEED = 40;
 const MARQUEE_PAUSE_MS = 1200;
-const MARQUEE_GAP = 60; // gap between repetitions
+const MARQUEE_GAP = 60;
 
 type SongBarProps = {
   songTitle: string;
@@ -82,7 +82,6 @@ export function SongBar({ songTitle, artist, album, onPress, onShuffle, contentW
   const paddingH = Math.max(12, contentWidth * 0.04);
   const thumbSize = Math.round(BAR_HEIGHT * 0.52);
   const iconSize = 24;
-  // Reserve space: thumb + gap + two icon buttons
   const textContainerWidth = contentWidth - paddingH * 2 - thumbSize - paddingH - iconSize * 2 - 24;
 
   const displayText = album ? `${songTitle} – ${artist} – ${album}` : `${songTitle} – ${artist}`;

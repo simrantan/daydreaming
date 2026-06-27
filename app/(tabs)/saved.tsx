@@ -8,8 +8,8 @@ import {
   Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Ionicons from '@expo/vector-icons/Ionicons';
-import { useFocusEffect } from 'expo-router';
+import Ionicons from 'react-native-vector-icons/Ionicons';
+import { useFocusEffect } from '@react-navigation/native';
 import { loadSavedItems, persistSavedItems, savedItemId, type SavedItem, type SaveType } from '@/api/saved';
 import { resolveDaydreamItems } from '@/api/daydream';
 import { SavedPlayer } from '@/components/explore/SavedPlayer';
@@ -25,7 +25,7 @@ function formatDate(ts: number): string {
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
-function itemIcon(type: SaveType): React.ComponentProps<typeof Ionicons>['name'] {
+function itemIcon(type: SaveType): string {
   if (type === 'video') return 'film-outline';
   if (type === 'music') return 'musical-notes-outline';
   return 'heart-outline';
@@ -54,7 +54,6 @@ export default function SavedScreen() {
     setAllItems(items);
   }, []);
 
-  // Reload whenever the tab becomes focused
   useFocusEffect(
     useCallback(() => {
       reload();
@@ -108,7 +107,6 @@ export default function SavedScreen() {
         )}
       </View>
 
-      {/* Segmented tabs */}
       <View style={styles.tabRow}>
         {TABS.map(({ label, type }) => (
           <Pressable

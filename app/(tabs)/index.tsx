@@ -11,8 +11,8 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useAudioPlayer, setAudioModeAsync } from 'expo-audio';
-import Ionicons from '@expo/vector-icons/Ionicons';
+import { useAudioPlayer, setAudioModeAsync } from '@/src/hooks/useAudioPlayer';
+import Ionicons from 'react-native-vector-icons/Ionicons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { WebView } from 'react-native-webview';
 import { getFeatured, getMoreFromApi, getNextSong, getQueue, type DaydreamItem, type SongTrack, type VideoAudioSource, type VideoTheme } from '@/api/daydream';
@@ -68,7 +68,11 @@ export default function ExploreScreen() {
     }).catch(() => {});
   }, []);
 
-  // Only use expo-audio for local (bundled) assets; SoundCloud URLs handled by WebView below
+  const currentItem = list[currentIndex] ?? null;
+  const currentSong = currentItem
+    ? (currentSongByIndex[currentIndex] ?? currentItem.song)
+    : null;
+
   useEffect(() => {
     if (!currentSong) return;
     if (isSoundCloudSource(currentSong.audioSource)) return;
@@ -83,7 +87,6 @@ export default function ExploreScreen() {
     setSavedItems(items);
   }, []);
 
-  // Load persisted preferences; auto-open picker if first launch
   useEffect(() => {
     async function loadPrefs() {
       try {
@@ -91,8 +94,6 @@ export default function ExploreScreen() {
         const storedTheme = await AsyncStorage.getItem('@daydreaming/videoTheme');
         if (storedMood !== null) setMoodValue(parseFloat(storedMood));
         if (storedTheme !== null) setVideoTheme(storedTheme === '' ? null : storedTheme as VideoTheme);
-
-        // Always show the picker on launch so user can set mood/theme
         setMoodPickerVisible(true);
       } catch {
         // ignore
@@ -117,11 +118,6 @@ export default function ExploreScreen() {
     loadSaved();
     return () => { cancelled = true; };
   }, [loadSaved, moodValue, videoTheme]);
-
-  const currentItem = list[currentIndex] ?? null;
-  const currentSong = currentItem
-    ? (currentSongByIndex[currentIndex] ?? currentItem.song)
-    : null;
 
   const handleShuffleForCard = useCallback(
     async (videoId: string) => {
@@ -345,7 +341,6 @@ export default function ExploreScreen() {
         />
       )}
 
-      {/* Hidden SoundCloud WebView — handles audio when source is a SoundCloud URL */}
       {currentSong && isSoundCloudSource(currentSong.audioSource) && (
         <WebView
           key={currentSong.audioSource.uri}

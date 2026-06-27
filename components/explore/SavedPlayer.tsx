@@ -8,8 +8,8 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useAudioPlayer, setAudioModeAsync } from 'expo-audio';
-import Ionicons from '@expo/vector-icons/Ionicons';
+import { useAudioPlayer, setAudioModeAsync } from '@/src/hooks/useAudioPlayer';
+import Ionicons from 'react-native-vector-icons/Ionicons';
 import type { DaydreamItem, SongTrack } from '@/api/daydream';
 import { VideoCard } from './VideoCard';
 
@@ -19,7 +19,6 @@ type SavedPlayerProps = {
   onClose: () => void;
 };
 
-// Repeat the list enough times to feel endless
 const LOOP_REPS = 50;
 
 function toAudioSource(source: DaydreamItem['song']['audioSource']): string | number {
@@ -35,7 +34,6 @@ export function SavedPlayer({ visible, items, onClose }: SavedPlayerProps) {
 
   const audioPlayer = useAudioPlayer(null);
 
-  // Build a long looping list
   const loopedItems: DaydreamItem[] = items.length > 0
     ? Array.from({ length: LOOP_REPS * items.length }, (_, i) => items[i % items.length])
     : [];
@@ -51,7 +49,6 @@ export function SavedPlayer({ visible, items, onClose }: SavedPlayerProps) {
     }
   }, [visible]);
 
-  // Play audio for the active card
   useEffect(() => {
     if (!currentSong || !visible) return;
     audioPlayer.replace(toAudioSource(currentSong.audioSource));
@@ -59,7 +56,6 @@ export function SavedPlayer({ visible, items, onClose }: SavedPlayerProps) {
     audioPlayer.play();
   }, [currentSong?.audioId, currentIndex, visible, audioPlayer]);
 
-  // Reset index when opened; pause when closed
   useEffect(() => {
     if (visible) {
       setCurrentIndex(0);
@@ -111,7 +107,6 @@ export function SavedPlayer({ visible, items, onClose }: SavedPlayerProps) {
           }}
         />
 
-        {/* Back button — top-left, over the video */}
         <Pressable
           style={[styles.backButton, { top: insets.top + 12 }]}
           onPress={onClose}

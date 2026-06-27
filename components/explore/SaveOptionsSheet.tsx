@@ -6,7 +6,7 @@ import {
   Modal,
   Pressable,
 } from 'react-native';
-import Ionicons from '@expo/vector-icons/Ionicons';
+import Ionicons from 'react-native-vector-icons/Ionicons';
 
 type SaveOptionsSheetProps = {
   visible: boolean;
@@ -21,7 +21,7 @@ type CheckRow = {
   key: 'daydream' | 'video' | 'music';
   label: string;
   sublabel: string;
-  icon: React.ComponentProps<typeof Ionicons>['name'];
+  icon: string;
 };
 
 const ROWS: CheckRow[] = [
@@ -42,7 +42,6 @@ export function SaveOptionsSheet({
   const [saveVideo, setSaveVideo] = useState(initialVideoSaved);
   const [saveMusic, setSaveMusic] = useState(initialMusicSaved);
 
-  // Reset checkboxes whenever sheet opens with new initial values
   useEffect(() => {
     if (visible) {
       setSaveDaydream(initialDaydreamSaved);

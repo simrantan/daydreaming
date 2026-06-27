@@ -1,7 +1,7 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import { StyleSheet, View, Pressable, Image } from 'react-native';
-import { useVideoPlayer, VideoView } from 'expo-video';
-import Ionicons from '@expo/vector-icons/Ionicons';
+import Video from 'react-native-video';
+import Ionicons from 'react-native-vector-icons/Ionicons';
 import type { DaydreamItem, SongTrack, VideoAudioSource } from '@/api/daydream';
 import { SongBar } from './SongBar';
 import { VimeoPlayer } from './VimeoPlayer';
@@ -10,32 +10,23 @@ function isVimeoSource(source: VideoAudioSource): source is { uri: string } {
   return typeof source !== 'number' && source.uri.includes('vimeo.com');
 }
 
-// Separate inner component so useVideoPlayer hook is never called conditionally
 function LocalVideoPlayer({
   source,
   isActive,
-  style,
 }: {
   source: number;
   isActive: boolean;
-  style?: object;
 }) {
-  const player = useVideoPlayer(source, (p) => {
-    p.loop = true;
-    p.muted = true;
-  });
-
-  useEffect(() => {
-    if (isActive) player.play();
-    else player.pause();
-  }, [isActive, player]);
-
   return (
-    <VideoView
-      style={[StyleSheet.absoluteFill, style]}
-      player={player}
-      contentFit="cover"
-      nativeControls={false}
+    <Video
+      source={source}
+      style={StyleSheet.absoluteFill}
+      resizeMode="cover"
+      repeat
+      muted
+      paused={!isActive}
+      controls={false}
+      ignoreSilentSwitch="ignore"
     />
   );
 }
@@ -76,7 +67,6 @@ export function VideoCard({
         isActive ? (
           <VimeoPlayer url={source.uri} isActive={isActive} style={StyleSheet.absoluteFill} />
         ) : (
-          // Show thumbnail for inactive cards — avoids loading 9 WebViews at once
           item.videoThumbnailUrl ? (
             <Image
               source={{ uri: item.videoThumbnailUrl }}
